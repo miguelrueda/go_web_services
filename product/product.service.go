@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go_web_services/cors"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,7 +30,12 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	product := getProduct(productID)
+
+	product, err := getProduct(productID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	if product == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -37,32 +43,32 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+
 		// return a single product
 		productJSON, err := json.Marshal(product)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(productJSON)
+		_, err = w.Write(productJSON)
+		if err != nil {
+			log.Fatal(err)
+		}
 	case http.MethodPut:
-		var updateProduct Product
-		bodyBytes, err := ioutil.ReadAll(r.Body)
+		var product Product
+		err := json.NewDecoder(r.Body).Decode(&product)
 		if err != nil {
+			log.Print(err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		err = json.Unmarshal(bodyBytes, &updateProduct)
-		if err != nil {
+		if product.ProductID != productID {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if updateProduct.ProductID != productID {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		product = &updateProduct
-		addOrUpdateProduct(updateProduct)
+		// product = &product
+		err = updateProduct(product)
 		w.WriteHeader(http.StatusOK)
 		return
 	case http.MethodDelete:
@@ -77,7 +83,10 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 func productsHandler(e http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		productList := getProductList()
+		productList, err := getProductList()
+		if err != nil {
+			e.WriteHeader(http.StatusInternalServerError)
+		}
 		productsJSON, err := json.Marshal(productList)
 		if err != nil {
 			e.WriteHeader(http.StatusInternalServerError)
@@ -99,7 +108,7 @@ func productsHandler(e http.ResponseWriter, r *http.Request) {
 			e.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		_, err = addOrUpdateProduct(newProduct)
+		_, err = insertProduct(newProduct)
 		if err != nil {
 			e.WriteHeader(http.StatusInternalServerError)
 			return

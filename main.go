@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
+	"go_web_services/database"
 	"go_web_services/product"
+	"go_web_services/receipt"
 	"net/http"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type fooHandler struct {
@@ -31,6 +35,8 @@ func middlewareHandler(handler http.Handler) http.Handler {
 const apiBasePath = "/api"
 
 func main() {
+	database.SetupDatabase()
 	product.SetupRoutes(apiBasePath)
+	receipt.SetupRoutes(apiBasePath)
 	http.ListenAndServe(":5000", nil)
 }
